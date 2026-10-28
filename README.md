@@ -97,9 +97,9 @@ then `sudo dtoverlay -r bcm-timer-plat` and `sudo dtoverlay -r bcm-pwm-plat`.
 
 | Driver | Video |
 |--------|-------|
-| Timer | https://youtu.be/Ros7_78uBJg |
-| PWM | https://youtu.be/U_tcdEtAESg |
-| RTC – power-loss test | https://youtu.be/U_tcdEtAESg |
+| Timer | https://youtu.be/U_tcdEtAESg |
+| PWM | https://youtu.be/Ros7_78uBJg |
+| RTC – power-loss test | https://youtu.be/DzwE6CQ0-nE |
 
 More details: [`VideoDemo/`](VideoDemo/).
 
