@@ -1,0 +1,40 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Overlay them platform device dung kenh 1 cua System Timer trong SoC
+ * BCM2835 (Raspberry Pi Zero W) cho driver tu viet bcm_timer_plat.ko.
+ *
+ * Timer he thong cua Linux (node timer@7e003000, kenh 3) KHONG bi dong toi.
+ *
+ * Bien dich : dtc -@ -I dts -O dtb -o bcm-timer-plat.dtbo bcm-timer-plat-overlay.dts
+ * config.txt: dtoverlay=bcm-timer-plat
+ *             (tuy chon) dtoverlay=bcm-timer-plat,period_us=100000,led_gpio=27
+ */
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2835";
+
+	fragment@0 {
+		target = <&soc>;	/* dia chi 0x7e... duoc dich qua "ranges" cua soc */
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			edu_timer: edu-timer@7e003000 {
+				compatible = "edu,bcm2835-timer-ch1";
+				reg = <0x7e003000 0x1c>;	/* CS, CLO, CHI, C0..C3 */
+				interrupt-parent = <&intc>;
+				interrupts = <1 1>;		/* bank GPU, ngat 1 = timer kenh 1 */
+				led-gpios = <&gpio 17 0>;	/* GPIO17 (chan 11), active-high */
+				edu,period-us = <500000>;	/* 0.5 s -> LED nhay 1 Hz */
+				status = "okay";
+			};
+		};
+	};
+
+	__overrides__ {
+		period_us = <&edu_timer>, "edu,period-us:0";
+		led_gpio  = <&edu_timer>, "led-gpios:4";
+	};
+};

@@ -1,0 +1,20 @@
+# Kernel module build artifacts
+*.o
+*.ko
+*.mod
+*.mod.c
+*.cmd
+.*.cmd
+*.dtbo
+Module.symvers
+modules.order
+.tmp_versions/
+.cache.mk
+# User-space test binary
+RTC/rtc_test
+# Editor / OS files
+.vscode/
+*~
+.DS_Store
+Thumbs.db
+~$*

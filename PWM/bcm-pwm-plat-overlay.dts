@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Overlay "de" len node PWM co san cua SoC BCM2835 (Raspberry Pi Zero W)
+ * de no duoc gan voi driver tu viet bcm_pwm_plat.ko thay vi pwm-bcm2835.
+ *
+ *   - doi compatible -> "edu,bcm2835-pwm-plat"
+ *   - bat node (status = "okay")
+ *   - noi PWM0 ra GPIO18 (chan 12), chuc nang ALT5
+ *
+ * Giu nguyen tu node goc: reg = <0x7e20c000 0x28>, clocks = PWM clock,
+ * assigned-clock-rates = 50 MHz.
+ *
+ * Bien dich : dtc -@ -I dts -O dtb -o bcm-pwm-plat.dtbo bcm-pwm-plat-overlay.dts
+ * config.txt: dtoverlay=bcm-pwm-plat
+ *             (KHONG dung chung voi dtoverlay=pwm / pwm-2chan)
+ */
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2835";
+
+	fragment@0 {
+		target = <&pwm>;
+		__overlay__ {
+			compatible = "edu,bcm2835-pwm-plat";
+			pinctrl-names = "default";
+			pinctrl-0 = <&pwm0_gpio18>;	/* GPIO18, ALT5 = PWM0 */
+			status = "okay";
+		};
+	};
+};

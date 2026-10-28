@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * ds1307-plat-overlay.dts
+ *
+ * Device Tree overlay cho Raspberry Pi Zero W:
+ *   - bat bus I2C1 (i2c_arm): GPIO2 = SDA1 (chan 3), GPIO3 = SCL1 (chan 5)
+ *   - them node platform "ds1307-plat" -> driver ds1307_plat.ko se probe()
+ *
+ * Bien dich : dtc -@ -I dts -O dtb -o ds1307-plat.dtbo ds1307-plat-overlay.dts
+ * Su dung   : chep vao /boot/firmware/overlays/ va them vao config.txt:
+ *                 dtparam=i2c_arm=on
+ *                 dtoverlay=ds1307-plat
+ *             (tuy chon) dtoverlay=ds1307-plat,addr=0x68
+ */
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2835";
+
+	/* Bat bo dieu khien I2C1, giu toc do 100 kHz (DS1307 toi da 100 kHz) */
+	fragment@0 {
+		target = <&i2c_arm>;
+		__overlay__ {
+			status = "okay";
+			clock-frequency = <100000>;
+		};
+	};
+
+	/* Node platform device - KHONG dat ben trong node i2c, vi day la
+	 * platform driver: no tu tim bus qua phandle "i2c-bus". */
+	fragment@1 {
+		target-path = "/";
+		__overlay__ {
+			ds1307_plat: ds1307-plat {
+				compatible = "edu,ds1307-platform";
+				i2c-bus = <&i2c_arm>;
+				i2c-address = <0x68>;
+				status = "okay";
+			};
+		};
+	};
+
+	__overrides__ {
+		addr = <&ds1307_plat>, "i2c-address:0";
+	};
+};
