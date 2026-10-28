@@ -27,7 +27,7 @@ Embedded-System/
 ├── Timer/        bcm_timer_plat.c, bcm-timer-plat-overlay.dts, Makefile, README.md, wiring diagram
 ├── PWM/          bcm_pwm_plat.c, bcm-pwm-plat-overlay.dts, Makefile, README.md, wiring diagram
 ├── RTC/          ds1307_plat.c, ds1307-plat-overlay.dts, rtc_test.c, Makefile, README.md, wiring diagram
-├── FinalReport/  report (PDF + Word) and presentation slides
+├── FinalReport/  report (PDF) and presentation slides
 ├── VideoDemo/    links to the three demonstration videos
 ├── images/       evidence screenshots used in the report
 └── README.md
@@ -104,7 +104,7 @@ More details: [`VideoDemo/`](VideoDemo/).
 
 ## Final report
 
-- Report: [`FinalReport/Group6_Platform_Driver_Report.pdf`](FinalReport/Group6_Platform_Driver_Report.pdf) (Word version in the same folder)
+- Report: [`FinalReport/Group6_Platform_Driver_Report.pdf`](FinalReport/Group6_Platform_Driver_Report.pdf)
 - Slides: [`FinalReport/Group6_Platform_Driver_Presentation.pptx`](FinalReport/Group6_Platform_Driver_Presentation.pptx)
 
 Chapter 1 covers the theory (platform driver model, Device Tree, kernel frameworks);
