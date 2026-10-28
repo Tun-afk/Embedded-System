@@ -399,15 +399,15 @@ sudo ./rtc_test watch 4
 ```
 
 ```
-set ok, now: 2030-12-31 23:59:58 UTC (Wed) epoch=1924991998
-2030-12-31 23:59:58 UTC (Wed) epoch=1924991998
-2030-12-31 23:59:59 UTC (Wed) epoch=1924991999
-2031-01-01 00:00:00 UTC (Thu) epoch=1924992000
-2031-01-01 00:00:01 UTC (Thu) epoch=1924992001
+set ok, now: 2030-12-31 23:59:58 UTC (Tue) epoch=1924991998
+2030-12-31 23:59:58 UTC (Tue) epoch=1924991998
+2030-12-31 23:59:59 UTC (Tue) epoch=1924991999
+2031-01-01 00:00:00 UTC (Wed) epoch=1924992000
+2031-01-01 00:00:01 UTC (Wed) epoch=1924992001
 ```
 
 Three things are checked at once: the write succeeded, the chip is counting (each line is 1 s later), and the year
-rolls over correctly (the weekday also changes from Wed to Thu).
+rolls over correctly (the weekday also changes from Tue to Wed).
 
 ### 9.4 Leap year
 
@@ -417,8 +417,8 @@ sleep 2; sudo ./rtc_test read
 ```
 
 ```
-set ok, now: 2028-02-28 23:59:59 UTC (Sat) epoch=1835395199
-2028-02-29 00:00:01 UTC (Sun) epoch=1835395201
+set ok, now: 2028-02-28 23:59:59 UTC (Mon) epoch=1835395199
+2028-02-29 00:00:01 UTC (Tue) epoch=1835395201
 ```
 
 2028 is a leap year, so 28 February must be followed by 29 February, not 1 March.
