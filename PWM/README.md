@@ -1,94 +1,101 @@
-# Platform Driver tự viết cho khối PWM của SoC BCM2835 – Raspberry Pi Zero W
+# Custom platform driver for the BCM2835 PWM block – Raspberry Pi Zero W
 
-Driver theo mẫu **"5) Platform Driver"**: thiết bị **tích hợp trong SoC**, mô tả bằng **Device Tree**, interface `platform_driver` + `probe()` / `remove()`.
+A **platform driver**: the device is **built into the SoC**, it is described by the **Device Tree**,
+and the driver uses the `platform_driver` interface with `probe()` / `remove()`.
 
 | | |
 |---|---|
-| Phần cứng | Khối PWM trong BCM2835, `pwm@7e20c000`, 2 kênh, clock 50 MHz |
+| Hardware | BCM2835 PWM block, `pwm@7e20c000`, 2 channels, 50 MHz clock |
 | Driver | `bcm_pwm_plat.c` → `bcm_pwm_plat.ko` |
 | Overlay | `bcm-pwm-plat-overlay.dts` → `bcm-pwm-plat.dtbo` |
 | `compatible` | `"edu,bcm2835-pwm-plat"` |
-| Giao diện | PWM framework chuẩn của Linux: `/sys/class/pwm/pwmchip0` |
-| Ngõ ra | Kênh 0 (PWM0) trên **GPIO18, chân 12** |
+| Interface | Standard Linux PWM framework: `/sys/class/pwm/pwmchip0` |
+| Output | Channel 0 (PWM0) on **GPIO18, pin 12** |
 
-**Quan hệ với driver của Pi: thay hẳn `pwm-bcm2835`.** Device Tree của Pi đã có sẵn node `pwm@7e20c000` (mặc định tắt) với `compatible = "brcm,bcm2835-pwm"`, ứng với driver gốc `pwm-bcm2835`. Overlay của bài này **sửa thẳng node đó**: đổi `compatible` sang chuỗi của bạn, bật node, và chuyển GPIO18 sang chức năng PWM. Driver gốc không còn khớp nên không được nạp; khối PWM hoàn toàn do driver của bạn điều khiển.
+**Relation to the Pi's own driver: this driver fully replaces `pwm-bcm2835`.** The Pi's Device Tree already
+contains a `pwm@7e20c000` node (disabled by default) with `compatible = "brcm,bcm2835-pwm"`, which matches
+the original `pwm-bcm2835` driver. This overlay **modifies that node directly**: it changes `compatible` to
+our own string, enables the node and switches GPIO18 to its PWM function. The original driver no longer
+matches and is not loaded, so the PWM block is controlled entirely by this driver.
 
-| File trong gói | Vai trò |
+| File | Role |
 |---|---|
-| `bcm_pwm_plat.c` | Code driver |
-| `bcm-pwm-plat-overlay.dts` | Device Tree overlay (đè node `&pwm`) |
-| `Makefile` | Build module `.ko` + overlay `.dtbo`, `make install` |
-| `README.md`, `wiring-led-pwm.png/.svg` | Hướng dẫn và sơ đồ, để trên máy tính |
+| `bcm_pwm_plat.c` | Driver code |
+| `bcm-pwm-plat-overlay.dts` | Device Tree overlay (overrides the `&pwm` node) |
+| `Makefile` | Builds the `.ko` module and the `.dtbo` overlay; `make install` |
+| `README.md`, `wiring-led-pwm.png` | This guide and the wiring diagram (stay on the PC) |
 
 ---
 
-## 1. Linh kiện
+## 1. Components
 
-| Linh kiện | Số lượng |
+| Component | Qty |
 |---|---|
-| Raspberry Pi Zero W đã hàn header, chạy Raspberry Pi OS 32-bit | 1 |
-| LED 5 mm | 1 |
-| Điện trở 330 Ω (220–470 Ω đều được) | 1 |
-| Breadboard + 2 dây jumper cái–đực | |
+| Raspberry Pi Zero W with soldered header, Raspberry Pi OS 32-bit | 1 |
+| 5 mm LED | 1 |
+| 330 Ω resistor (220–470 Ω also works) | 1 |
+| Breadboard + 2 female–male jumper wires | |
 
-Không cần nguồn riêng, tụ hay transistor: LED chỉ ăn khoảng 3–6 mA, GPIO của Pi cấp được.
+No separate power supply, capacitor or transistor is needed: the LED draws only 3–6 mA, which a Pi GPIO can supply.
 
 ---
 
-## 2. Lắp phần cứng
+## 2. Wiring
 
-![Sơ đồ nối LED](wiring-led-pwm.png)
+![LED wiring](wiring-led-pwm.png)
 
-| Từ chân Pi | Qua | Về chân Pi |
+| From Pi pin | Through | To Pi pin |
 |---|---|---|
-| **Chân 12** (GPIO18 = PWM0) | điện trở 330 Ω → LED | **Chân 14** (GND) |
+| **Pin 12** (GPIO18 = PWM0) | 330 Ω resistor → LED | **Pin 14** (GND) |
 
-1. **Tắt Pi, rút nguồn.**
-2. Cắm LED lên breadboard, mỗi chân một hàng.
-3. Nhận chân LED: **chân dài = (+) anode**, **chân ngắn = (−) cathode** (phía vành nhựa bị vát phẳng).
-4. Một đầu điện trở cùng hàng với chân dài; đầu kia nối dây về **chân 12**. Chân ngắn nối dây về **chân 14**.
-5. Chân 12 và 14 đều ở hàng sát mép board (chân 1 là pad vuông, gần khe thẻ SD; hàng mép là các chân chẵn).
-6. Kiểm tra: LED đúng chiều, có điện trở nối tiếp, không dây nào cắm vào chân 2, 4 (5 V).
-7. Cắm nguồn.
+1. **Shut down the Pi and unplug it.**
+2. Put the LED on the breadboard, each leg in its own row.
+3. Identify the legs: **long leg = (+) anode**, **short leg = (−) cathode** (flat side of the plastic rim).
+4. One end of the resistor goes in the same row as the long leg; the other end goes to **pin 12**. The short leg goes to **pin 14**.
+5. Pins 12 and 14 are on the outer row of the header (pin 1 is the square pad, next to the SD-card slot; the outer row holds the even pins).
+6. Check: LED the right way round, resistor in series, no wire on pins 2 or 4 (5 V).
+7. Plug the power back in.
 
-4 dây DS1307 (chân 3–6) và LED của bài Timer (chân 9, 11) có thể giữ nguyên, không xung đột.
+The four DS1307 wires (pins 3–6) and the Timer LED (pins 9, 11) can stay connected; there is no conflict.
 
-**Test LED trước khi dùng driver** (tùy chọn): `pinctrl set 18 op dh` thì LED sáng, `pinctrl set 18 op dl` thì tắt. Không sáng là LED bị ngược hoặc dây lỏng. Test xong thì **khởi động lại Pi** trước khi nạp driver (lệnh `pinctrl` đã chuyển chân 18 sang chế độ output thường).
+**Test the LED before using the driver** (optional): `pinctrl set 18 op dh` turns the LED on, `pinctrl set 18 op dl` turns it off.
+If it does not light, the LED is reversed or a wire is loose. **Reboot the Pi** after this test, before loading the driver
+(the `pinctrl` command has switched pin 18 to a plain output).
 
 ---
 
-## 3. Chuẩn bị Raspberry Pi OS
+## 3. Preparing Raspberry Pi OS
 
-Nếu đã làm cho bài khác (DS1307, Timer) thì chỉ cần làm bước kiểm tra `config.txt` ở cuối mục này.
+If this was already done for another driver (DS1307, Timer), only the `config.txt` check at the end of this section is needed.
 
 ```bash
 sudo apt update
 sudo apt full-upgrade -y
 sudo reboot
-# sau khi khởi động lại:
+# after the reboot:
 sudo apt install -y build-essential device-tree-compiler linux-headers-rpi-v6
-ls -d /lib/modules/$(uname -r)/build      # phải tồn tại
+ls -d /lib/modules/$(uname -r)/build      # must exist
 ```
 
-Kiểm tra `config.txt` **không** có overlay PWM gốc của Pi, vì overlay đó dùng cùng node `&pwm`:
+Check that `config.txt` does **not** enable the Pi's own PWM overlay, because it uses the same `&pwm` node:
 
 ```bash
 grep -n -e "dtoverlay=pwm" -e "audremap" /boot/firmware/config.txt
 ```
 
-Lệnh không in gì là đúng. Nếu có dòng nào, thêm dấu `#` ở đầu dòng đó để tắt.
+No output is correct. If a line is printed, put a `#` at the start of that line to disable it.
 
 ---
 
-## 4. Chép code lên Pi
+## 4. Copying the code to the Pi
 
-Chỉ cần **3 file**: `bcm_pwm_plat.c`, `bcm-pwm-plat-overlay.dts`, `Makefile`.
+Only **3 files** are needed: `bcm_pwm_plat.c`, `bcm-pwm-plat-overlay.dts`, `Makefile`.
 
-Từ máy tính (Windows: mở PowerShell trong thư mục chứa các file):
+From the PC (on Windows, open PowerShell in the folder that contains the files):
 
 ```bash
-ssh <user>@<hostname>.local "mkdir -p ~/bcm-pwm-plat"
-scp bcm_pwm_plat.c bcm-pwm-plat-overlay.dts Makefile <user>@<hostname>.local:~/bcm-pwm-plat/
+ssh <user>@<hostname>.local "mkdir -p ~/PWM"
+scp bcm_pwm_plat.c bcm-pwm-plat-overlay.dts Makefile <user>@<hostname>.local:~/PWM/
 ```
 
 ---
@@ -96,42 +103,43 @@ scp bcm_pwm_plat.c bcm-pwm-plat-overlay.dts Makefile <user>@<hostname>.local:~/b
 ## 5. Build
 
 ```bash
-cd ~/bcm-pwm-plat
+cd ~/PWM
 make
 ```
 
-Kết quả: `bcm_pwm_plat.ko` (kernel module) và `bcm-pwm-plat.dtbo` (overlay đã biên dịch).
+Output: `bcm_pwm_plat.ko` (kernel module) and `bcm-pwm-plat.dtbo` (compiled overlay).
 
 ---
 
-## 6. Nạp overlay và driver
+## 6. Loading the overlay and the driver
 
-### Cách A (khuyên dùng): cài cố định
+### Method A (recommended): permanent installation
 
 ```bash
 sudo make install
 sudo nano /boot/firmware/config.txt
 ```
 
-Thêm vào **cuối file** (dưới dòng `[all]`):
+Add at the **end of the file** (below the `[all]` line):
 
 ```
 dtoverlay=bcm-pwm-plat
 ```
 
-Lưu và `sudo reboot`. Khi khởi động, udev tự `modprobe bcm_pwm_plat` theo `compatible`, rồi `probe()` chạy. LED chưa sáng: PWM chỉ bắt đầu xuất xung khi bạn bật ở mục 8.
+Save and `sudo reboot`. At boot, udev runs `modprobe bcm_pwm_plat` from the `compatible` alias and `probe()` runs.
+The LED stays off for now: the PWM only starts producing pulses when it is enabled in section 8.
 
-### Cách B: nạp tạm, không cần khởi động lại (mất khi reboot)
+### Method B: temporary loading without a reboot (lost after a reboot)
 
 ```bash
-cd ~/bcm-pwm-plat
+cd ~/PWM
 sudo dtoverlay -d . bcm-pwm-plat
 sudo insmod ./bcm_pwm_plat.ko
 ```
 
 ---
 
-## 7. Kiểm tra `probe()` đã chạy
+## 7. Checking that `probe()` ran
 
 ```bash
 sudo dmesg | grep bcm-pwm-plat
@@ -143,21 +151,26 @@ bcm-pwm-plat 2020c000.pwm: PWM ready: 2 channels, clock 50000000 Hz (20 ns/tick)
 
 ---
 
-## 8. Test driver
+## 8. Testing the driver
 
-Đọc file trong `/sys` thì không cần quyền gì, nhưng **ghi** vào đó cần quyền root. Vì vậy mọi lệnh ghi đều có dạng:
+Reading files in `/sys` needs no special rights, but **writing** them requires root. Every write therefore has the form:
 
 ```bash
-echo <giá trị> | sudo tee <file> > /dev/null
+echo <value> | sudo tee <file> > /dev/null
 ```
 
-`sudo tee` ghi giá trị vào file với quyền root; `> /dev/null` chỉ để `tee` không in lại giá trị ra màn hình. **Không** dùng `sudo echo <giá trị> > <file>`: dấu `>` được shell của user thường xử lý trước khi `sudo` chạy, nên vẫn báo `Permission denied`. Các lệnh `rmmod`, `modprobe`, `insmod`, `dmesg` cũng cần `sudo`.
+`sudo tee` writes the value with root rights; `> /dev/null` only stops `tee` from echoing the value.
+Do **not** use `sudo echo <value> > <file>`: the `>` is handled by the normal user's shell before `sudo`
+runs, so it still fails with `Permission denied`. `rmmod`, `modprobe`, `insmod` and `dmesg` also need `sudo`.
 
-Biến `$P` (thư mục driver) được đặt ở mục 8.3, biến `$C` (`/sys/class/pwm/pwmchip0`) ở mục 8.4. Nếu mở terminal mới, chạy lại lệnh đặt biến đó trước.
+The variable `$P` (the driver's directory) is set in section 8.3 and `$C` (`/sys/class/pwm/pwmchip0`) in section 8.4.
+In a new terminal, run the command that sets the variable again first.
 
-Kết quả mẫu là output thật khi chạy đúng các lệnh này trên Pi Zero giả lập (mục 12). Riêng dòng báo lỗi được ghi theo `tee` của Raspberry Pi OS (`tee: <file>: Invalid argument`); `tee` rút gọn của máy giả lập in `I/O error` thay cho `Invalid argument`.
+The sample outputs below were produced by running exactly these commands on an emulated Pi Zero (section 12).
+The error lines are shown as printed by the `tee` of Raspberry Pi OS (`tee: <file>: Invalid argument`);
+the minimal `tee` of the emulated system prints `I/O error` instead of `Invalid argument`.
 
-### 8.1 Driver tự viết đã thay driver của Pi
+### 8.1 The custom driver has replaced the Pi's driver
 
 ```bash
 cat /proc/device-tree/soc/pwm@7e20c000/compatible; echo
@@ -171,13 +184,13 @@ bcm_pwm_plat 12288 0 - Live 0xbf006000 (O)
 2020c000.pwm  bind  module  uevent  unbind
 ```
 
-- Node `pwm@7e20c000` giờ mang `compatible` của bạn (gốc là `brcm,bcm2835-pwm`).
-- `lsmod` chỉ có `bcm_pwm_plat`, **không có `pwm_bcm2835`**: driver gốc không được nạp.
-- Thiết bị `2020c000.pwm` đã gắn với driver `bcm-pwm-plat`.
+- The `pwm@7e20c000` node now carries our `compatible` (originally `brcm,bcm2835-pwm`).
+- `lsmod` lists only `bcm_pwm_plat`, **not `pwm_bcm2835`**: the original driver is not loaded.
+- The device `2020c000.pwm` is bound to the `bcm-pwm-plat` driver.
 
-Trên Pi, `lsmod` in theo dạng cột (`bcm_pwm_plat  12288  0`), nội dung như nhau.
+On the Pi, `lsmod` prints in columns (`bcm_pwm_plat  12288  0`); the content is the same.
 
-### 8.2 GPIO18 đã chuyển sang chức năng PWM
+### 8.2 GPIO18 has been switched to its PWM function
 
 ```bash
 sudo sh -c 'grep "pin 18" /sys/kernel/debug/pinctrl/*/pinmux-pins'
@@ -187,11 +200,14 @@ sudo sh -c 'grep "pin 18" /sys/kernel/debug/pinctrl/*/pinmux-pins'
 pin 18 (gpio18): 2020c000.pwm (GPIO UNCLAIMED) function alt5 group gpio18
 ```
 
-Lệnh cần `sudo sh -c '...'` vì thư mục `/sys/kernel/debug` chỉ root mới vào được, kể cả để dấu `*` tìm ra tên file. Kernel mới hơn (6.18) in dạng `pin 18 (gpio18): device 2020c000.pwm function alt5 group gpio18`, cùng ý nghĩa.
+The command needs `sudo sh -c '...'` because only root can enter `/sys/kernel/debug`, even for the `*` to
+expand to the file name. Newer kernels (6.18) print `pin 18 (gpio18): device 2020c000.pwm function alt5 group gpio18`,
+which means the same.
 
-Pinctrl trong overlay (`pinctrl-0 = <&pwm0_gpio18>`) đã chuyển chân 18 sang **ALT5 = PWM0** và giao cho thiết bị `2020c000.pwm`. Việc này do driver core làm ngay trước khi gọi `probe()`.
+The pinctrl entry in the overlay (`pinctrl-0 = <&pwm0_gpio18>`) has switched pin 18 to **ALT5 = PWM0** and
+assigned it to the device `2020c000.pwm`. The driver core does this just before calling `probe()`.
 
-### 8.3 Clock và thanh ghi ban đầu
+### 8.3 Clock and initial registers
 
 ```bash
 P=$(ls -d /sys/bus/platform/drivers/bcm-pwm-plat/*.pwm); cat $P/clock_hz; cat $P/regs
@@ -205,9 +221,11 @@ pwmchip0
 2
 ```
 
-Clock PWM 50 MHz (1 xung = 20 ns), lấy từ `assigned-clock-rates` trong Device Tree. Driver đăng ký 1 `pwmchip` có 2 kênh. `regs` và `clock_hz` là 2 thuộc tính driver tự thêm để xem thanh ghi.
+The PWM clock is 50 MHz (1 tick = 20 ns), taken from `assigned-clock-rates` in the Device Tree. The driver
+registers one `pwmchip` with 2 channels. `regs` and `clock_hz` are two extra attributes added by the driver to
+inspect the registers.
 
-### 8.4 Xuất xung: chu kỳ 1 ms (1 kHz), duty 25%
+### 8.4 Output a 1 ms period (1 kHz), 25 % duty cycle
 
 ```bash
 C=/sys/class/pwm/pwmchip0; echo 0 | sudo tee $C/export > /dev/null; ls $C/pwm0
@@ -219,12 +237,12 @@ capture  duty_cycle  enable  period  polarity  power  uevent
 CTL=0x00000081 STA=0x00000000 RNG1=50000 DAT1=12500 RNG2=0 DAT2=0
 ```
 
-**LED sáng mờ.** Kiểm tra thanh ghi:
-- `RNG1 = 50000` = 1 000 000 ns / 20 ns: chu kỳ 1 ms.
-- `DAT1 = 12500` = 250 000 ns / 20 ns: mức cao 25%.
-- `CTL = 0x81` = bit 7 `MSEN` (chế độ mark-space) + bit 0 `PWEN` (bật kênh 0).
+**The LED lights dimly.** Register check:
+- `RNG1 = 50000` = 1 000 000 ns / 20 ns: 1 ms period.
+- `DAT1 = 12500` = 250 000 ns / 20 ns: 25 % high time.
+- `CTL = 0x81` = bit 7 `MSEN` (mark-space mode) + bit 0 `PWEN` (channel 0 enabled).
 
-### 8.5 Sáng tối đa và tắt
+### 8.5 Full brightness and off
 
 ```bash
 echo 1000000 | sudo tee $C/pwm0/duty_cycle > /dev/null; cat $P/regs
@@ -236,9 +254,9 @@ CTL=0x00000081 STA=0x00000000 RNG1=50000 DAT1=50000 RNG2=0 DAT2=0
 CTL=0x00000081 STA=0x00000000 RNG1=50000 DAT1=0 RNG2=0 DAT2=0
 ```
 
-Duty 100% (`DAT1 = RNG1`) thì LED **sáng nhất**; duty 0 thì LED **tắt**.
+At 100 % duty (`DAT1 = RNG1`) the LED is at **full brightness**; at 0 % it is **off**.
 
-### 8.6 LED sáng dần rồi tối dần (3 lần)
+### 8.6 Breathing LED (3 cycles)
 
 ```bash
 for i in 1 2 3; do for d in $(seq 0 50000 1000000) $(seq 1000000 -50000 0); do echo $d | sudo tee $C/pwm0/duty_cycle > /dev/null; sleep 0.02; done; done; cat $P/regs
@@ -248,9 +266,11 @@ for i in 1 2 3; do for d in $(seq 0 50000 1000000) $(seq 1000000 -50000 0); do e
 CTL=0x00000081 STA=0x00000000 RNG1=50000 DAT1=0 RNG2=0 DAT2=0
 ```
 
-LED "thở": sáng dần, tối dần. Mỗi bước gọi `sudo` một lần nên trên Pi Zero mỗi vòng mất vài giây; cả lệnh chạy khoảng 15–30 giây. Đây là bằng chứng trực quan nhất rằng driver điều khiển được khối PWM.
+The LED "breathes": it fades in and out. Each step calls `sudo` once, so on the Pi Zero each cycle takes a few
+seconds and the whole command runs for about 15–30 s. This is the clearest visual proof that the driver
+controls the PWM block.
 
-### 8.7 Đảo cực tính
+### 8.7 Inverting the polarity
 
 ```bash
 echo 0 | sudo tee $C/pwm0/enable > /dev/null; echo inversed | sudo tee $C/pwm0/polarity > /dev/null; echo 250000 | sudo tee $C/pwm0/duty_cycle > /dev/null; echo 1 | sudo tee $C/pwm0/enable > /dev/null; cat $P/regs
@@ -261,9 +281,11 @@ echo 0 | sudo tee $C/pwm0/enable > /dev/null; echo normal | sudo tee $C/pwm0/pol
 CTL=0x00000091 STA=0x00000000 RNG1=50000 DAT1=12500 RNG2=0 DAT2=0
 ```
 
-`CTL = 0x91`: thêm bit 4 `POLA`. Cùng duty 25% nhưng xung bị đảo nên **LED sáng hơn hẳn** (mức cao 75%). Phải tắt kênh trước khi đổi cực tính (yêu cầu của PWM framework). Lệnh thứ hai trả cực tính về bình thường.
+`CTL = 0x91`: bit 4 `POLA` is added. The duty cycle is still 25 %, but the signal is inverted, so **the LED is
+much brighter** (75 % high time). The channel must be disabled before the polarity is changed (a PWM framework
+rule). The second command restores normal polarity.
 
-### 8.8 Từ chối chu kỳ quá ngắn
+### 8.8 Rejecting a period that is too short
 
 ```bash
 echo 0 | sudo tee $C/pwm0/duty_cycle > /dev/null; echo 20 | sudo tee $C/pwm0/period > /dev/null
@@ -275,11 +297,13 @@ tee: /sys/class/pwm/pwmchip0/pwm0/period: Invalid argument
 1000000
 ```
 
-20 ns chỉ bằng 1 xung clock; khối PWM cần tối thiểu 2 xung (40 ns). Hàm `apply()` của driver trả `-EINVAL`, và chu kỳ cũ được giữ nguyên.
+20 ns is only one clock tick; the PWM block needs at least 2 ticks (40 ns). The driver's `apply()` returns
+`-EINVAL` and the old period is kept.
 
-### 8.9 `remove()` và `probe()`
+### 8.9 `remove()` and `probe()`
 
-Trước khi gỡ driver phải **unexport** kênh đang dùng. Nếu còn export, `rmmod` sẽ báo module đang được dùng (kernel giữ tham chiếu tới module).
+The channel in use must be **unexported** before the driver is removed. While it is still exported, `rmmod`
+reports that the module is in use (the kernel holds a reference to the module).
 
 ```bash
 echo 0 | sudo tee $C/pwm0/enable > /dev/null; echo 0 | sudo tee $C/unexport > /dev/null; sudo rmmod bcm_pwm_plat; sudo dmesg | tail -n 1; ls /sys/class/pwm/ | wc -l
@@ -290,11 +314,11 @@ bcm-pwm-plat 2020c000.pwm: removing PWM (outputs will be switched off)
 0
 ```
 
-`remove()` chạy, `pwmchip0` biến mất, cả hai kênh bị tắt (`CTL = 0`). Nạp lại:
+`remove()` ran, `pwmchip0` is gone and both channels are switched off (`CTL = 0`). Reload:
 
 ```bash
-sudo modprobe bcm_pwm_plat            # Cách A
-# hoặc: sudo insmod ./bcm_pwm_plat.ko   (Cách B)
+sudo modprobe bcm_pwm_plat            # Method A
+# or: sudo insmod ./bcm_pwm_plat.ko   (Method B)
 sudo dmesg | tail -n 1
 ```
 
@@ -302,93 +326,95 @@ sudo dmesg | tail -n 1
 bcm-pwm-plat 2020c000.pwm: PWM ready: 2 channels, clock 50000000 Hz (20 ns/tick), CTL=0x00000000
 ```
 
-
 ---
 
-## 9. Gỡ cài đặt (trả lại driver gốc của Pi)
+## 9. Uninstalling (restoring the Pi's original driver)
 
 ```bash
-sudo nano /boot/firmware/config.txt     # xóa dòng dtoverlay=bcm-pwm-plat
-cd ~/bcm-pwm-plat && sudo make uninstall && make clean
+sudo nano /boot/firmware/config.txt     # delete the line dtoverlay=bcm-pwm-plat
+cd ~/PWM && sudo make uninstall && make clean
 sudo reboot
 ```
 
-Sau khi reboot, node `&pwm` trở lại `compatible = "brcm,bcm2835-pwm"` (trạng thái tắt như mặc định). Muốn dùng driver PWM gốc thì thêm `dtoverlay=pwm`.
+After the reboot the `&pwm` node is back to `compatible = "brcm,bcm2835-pwm"` (disabled, as by default).
+To use the original PWM driver, add `dtoverlay=pwm`.
 
 ---
 
-## 10. Xử lý lỗi thường gặp
+## 10. Troubleshooting
 
-| Hiện tượng | Nguyên nhân / Cách sửa |
+| Symptom | Cause / fix |
 |---|---|
-| `make`: `/lib/modules/.../build: No such file or directory` | Chưa cài `linux-headers-rpi-v6`, hoặc kernel và headers lệch phiên bản (`full-upgrade` rồi `reboot`). |
-| `insmod: ... Invalid module format` | Module build cho kernel khác. `make clean && make` lại sau khi reboot. |
-| `dmesg` không có dòng `bcm-pwm-plat` | Overlay chưa nạp. Kiểm tra `cat /proc/device-tree/soc/pwm@7e20c000/compatible`. Với Cách B, chạy `dtoverlay` trước `insmod`. |
-| `lsmod` có `pwm_bcm2835`, không có `bcm_pwm_plat` | Trong `config.txt` còn `dtoverlay=pwm` hoặc `pwm-2chan`. Tắt dòng đó, reboot. |
-| `cannot get PWM clock` | Node `&pwm` thiếu `clocks` (DTB không đúng cho Pi Zero). Kiểm tra `ls /proc/device-tree/soc/pwm@7e20c000/`. |
-| LED không sáng nhưng `regs` đúng như mục 8.4 | LED ngược / sai chân (phải là **chân 12**). Kiểm tra mục 8.2 có `function alt5`. Nếu đã dùng `pinctrl set 18 ...` thì reboot. |
-| LED sáng nhưng không đổi độ sáng | Chu kỳ quá dài (vài trăm ms trở lên) nên LED nháy thay vì mờ. Dùng `period` ≤ 1 000 000 (1 ms). |
-| `echo ... > duty_cycle: Invalid argument` | `duty_cycle` lớn hơn `period`. Đặt `period` trước, `duty_cycle` sau. |
-| `rmmod bcm_pwm_plat`: module đang được dùng | Còn kênh PWM được export. `echo 0 \| sudo tee /sys/class/pwm/pwmchip0/unexport` rồi thử lại. |
-| `... /sys/...: Permission denied` | Ghi vào `/sys` mà không có quyền root. Dùng `echo <giá trị> \| sudo tee <file>`, không dùng `echo ... > file` hay `sudo echo ... > file`. |
+| `make`: `/lib/modules/.../build: No such file or directory` | `linux-headers-rpi-v6` not installed, or kernel and headers do not match (`full-upgrade`, then `reboot`). |
+| `insmod: ... Invalid module format` | Module built for another kernel. Run `make clean && make` again after the reboot. |
+| No `bcm-pwm-plat` line in `dmesg` | Overlay not applied. Check `cat /proc/device-tree/soc/pwm@7e20c000/compatible`. With Method B, run `dtoverlay` before `insmod`. |
+| `lsmod` shows `pwm_bcm2835` but not `bcm_pwm_plat` | `config.txt` still contains `dtoverlay=pwm` or `pwm-2chan`. Disable that line and reboot. |
+| `cannot get PWM clock` | The `&pwm` node has no `clocks` (wrong DTB for the Pi Zero). Check `ls /proc/device-tree/soc/pwm@7e20c000/`. |
+| LED off although `regs` matches section 8.4 | LED reversed or wrong pin (must be **pin 12**). Check that section 8.2 shows `function alt5`. If `pinctrl set 18 ...` was used, reboot. |
+| LED lights but the brightness does not change | Period too long (a few hundred ms or more), so the LED blinks instead of dimming. Use `period` ≤ 1 000 000 (1 ms). |
+| `echo ... > duty_cycle: Invalid argument` | `duty_cycle` is larger than `period`. Set `period` first, then `duty_cycle`. |
+| `rmmod bcm_pwm_plat`: module is in use | A PWM channel is still exported. Run `echo 0 \| sudo tee /sys/class/pwm/pwmchip0/unexport` and try again. |
+| `... /sys/...: Permission denied` | Writing to `/sys` without root. Use `echo <value> \| sudo tee <file>`, not `echo ... > file` or `sudo echo ... > file`. |
 
 ---
 
-## 11. Giải thích code (dùng cho báo cáo)
+## 11. Code explanation
 
-### 11.1 Luồng hoạt động
+### 11.1 Flow
 
 ```
-config.txt: dtoverlay=bcm-pwm-plat        firmware ghép overlay vào Device Tree
+config.txt: dtoverlay=bcm-pwm-plat        firmware merges the overlay into the Device Tree
         │
         ▼
-Node có sẵn /soc/pwm@7e20c000 sau khi bị overlay "đè":
-    compatible = "edu,bcm2835-pwm-plat";   // đổi (gốc: "brcm,bcm2835-pwm")
-    status     = "okay";                   // bật (gốc: "disabled")
-    pinctrl-0  = <&pwm0_gpio18>;           // thêm: GPIO18 ALT5
-    reg, clocks, assigned-clock-rates      // giữ nguyên từ DTB gốc của Pi
-        │  kernel tạo platform_device; driver core áp dụng pinctrl;
-        │  udev modprobe theo alias "of:...Cedu,bcm2835-pwm-plat"
+Existing node /soc/pwm@7e20c000 after the overlay overrides it:
+    compatible = "edu,bcm2835-pwm-plat";   // changed (original: "brcm,bcm2835-pwm")
+    status     = "okay";                   // enabled (original: "disabled")
+    pinctrl-0  = <&pwm0_gpio18>;           // added: GPIO18 ALT5
+    reg, clocks, assigned-clock-rates      // kept from the Pi's original DTB
+        │  kernel creates a platform_device; driver core applies pinctrl;
+        │  udev modprobe from alias "of:...Cedu,bcm2835-pwm-plat"
         ▼
-platform_driver_register()  ──khớp compatible──►  probe(pdev)
-        ├─ devm_platform_ioremap_resource()   → thanh ghi 0x7e20c000
-        ├─ devm_clk_get_enabled()             → clock PWM 50 MHz
-        ├─ devm_add_action_or_reset(hw_off)   → hàm tắt PWM khi gỡ
+platform_driver_register()  ──compatible matches──►  probe(pdev)
+        ├─ devm_platform_ioremap_resource()   → registers at 0x7e20c000
+        ├─ devm_clk_get_enabled()             → 50 MHz PWM clock
+        ├─ devm_add_action_or_reset(hw_off)   → switch-off action for removal
         └─ devm_pwmchip_add()                 → /sys/class/pwm/pwmchip0
 
 echo ... > /sys/class/pwm/pwmchip0/pwm0/...  ──►  PWM framework  ──►  bcm_pwm_apply()
-        └─ ns → số xung 20 ns; ghi RNG1, DAT1; bật MSEN + PWEN trong CTL
+        └─ ns → 20 ns ticks; write RNG1, DAT1; set MSEN + PWEN in CTL
 
-rmmod  ──►  remove()  ──►  devm (ngược): gỡ pwmchip → hw_off (CTL = 0) → tắt clock → bỏ iomap
+rmmod  ──►  remove()  ──►  devm (reverse order): remove pwmchip → hw_off (CTL = 0) → disable clock → unmap
 ```
 
-### 11.2 Các điểm kỹ thuật chính
+### 11.2 Key technical points
 
-| Điểm | Cách làm |
+| Point | Implementation |
 |---|---|
-| "Đè" driver gốc | Overlay sửa **node có sẵn** `&pwm` thay vì thêm node mới, nên dùng lại đúng `reg`, `clocks` mà Raspberry Pi đã khai báo. Chỉ đổi `compatible` là đủ để driver gốc không khớp nữa. |
-| Tài nguyên từ DT | Thanh ghi (`reg`), clock (`clocks` + `assigned-clock-rates`), chân ra (`pinctrl`) đều lấy từ Device Tree, không ghi cứng địa chỉ trong code. |
-| Tích hợp kernel | Đăng ký `pwm_chip` với **PWM framework**, nên có sẵn giao diện chuẩn `/sys/class/pwm` mà mọi chương trình Linux đều dùng được. |
-| `apply()` | Đổi ns → số xung clock (`mul_u64_u64_div_u64`, không tràn số), giới hạn `duty ≤ period`, ghi `RNGn`/`DATn`, bật `MSEN`+`PWEN` (+`POLA` nếu đảo cực). |
-| `get_state()` | Đọc ngược thanh ghi ra ns để framework biết trạng thái thật của phần cứng khi đăng ký. |
-| Hai kênh dùng chung `CTL` | Đọc–sửa–ghi `CTL` trong `spinlock` để kênh 0 và kênh 1 không ghi đè bit của nhau (bật cả hai kênh thì `CTL = 0x8181`). |
-| Thứ tự gỡ | Hàm tắt phần cứng được đăng ký **trước** `devm_pwmchip_add()`, nên khi gỡ (thứ tự ngược) nó chạy **sau** khi `pwmchip` đã bị gỡ: không ai còn bật lại PWM được nữa. |
-| Tương thích kernel | Kernel ≥ 6.9 dùng `devm_pwmchip_alloc()`; kernel cũ hơn nhúng `struct pwm_chip` trong struct riêng. `.remove` trả `void` từ 6.11. |
+| Overriding the original driver | The overlay modifies the **existing** `&pwm` node instead of adding a new one, so it reuses the `reg` and `clocks` declared by Raspberry Pi. Changing `compatible` is enough for the original driver to stop matching. |
+| Resources from the DT | Registers (`reg`), clock (`clocks` + `assigned-clock-rates`) and output pin (`pinctrl`) all come from the Device Tree; no addresses are hard-coded. |
+| Kernel integration | A `pwm_chip` is registered with the **PWM framework**, which provides the standard `/sys/class/pwm` interface usable by any Linux program. |
+| `apply()` | Converts ns to clock ticks (`mul_u64_u64_div_u64`, no overflow), limits `duty ≤ period`, writes `RNGn`/`DATn`, sets `MSEN`+`PWEN` (+`POLA` when inverted). |
+| `get_state()` | Converts the registers back to ns so the framework knows the real hardware state at registration. |
+| Two channels share `CTL` | `CTL` is read-modified-written under a `spinlock` so channels 0 and 1 never overwrite each other's bits (both enabled gives `CTL = 0x8181`). |
+| Removal order | The hardware switch-off action is registered **before** `devm_pwmchip_add()`, so on removal (reverse order) it runs **after** the `pwmchip` is gone: nothing can re-enable the PWM afterwards. |
+| Kernel compatibility | Kernels ≥ 6.9 use `devm_pwmchip_alloc()`; older kernels embed `struct pwm_chip` in the private struct. `.remove` returns `void` since 6.11. |
 
 ---
 
-## 12. Đã kiểm thử những gì
+## 12. Testing done
 
-Code được kiểm thử với **kernel Raspberry Pi thật** (mã nguồn `raspberrypi/linux`, cấu hình `bcmrpi_defconfig` cho Pi Zero / Zero W, ARMv6) trên **máy Pi Zero giả lập** (QEMU 10.2, máy `raspi0`; có clock manager và pinctrl). QEMU không mô phỏng khối PWM, nên mình thêm một mô hình thanh ghi đơn giản để ghi lại mọi lần driver đọc/ghi thanh ghi PWM.
+The code was tested with the **real Raspberry Pi kernel** (`raspberrypi/linux` sources, `bcmrpi_defconfig` for
+Pi Zero / Zero W, ARMv6) on an **emulated Pi Zero** (QEMU 10.2, `raspi0` machine, with clock manager and pinctrl).
+QEMU does not emulate the PWM block, so a simple register model was added to record every PWM register read/write
+made by the driver. The driver was then run on the **real Raspberry Pi Zero W** (kernel 6.18.50+rpt-rpi-v6).
 
-| Hạng mục | Kết quả |
+| Item | Result |
 |---|---|
-| Biên dịch với kernel Pi **6.6**, **6.12**, **6.18** (`W=1`) | Không có cảnh báo nào |
-| `checkpatch.pl` | 0 lỗi; chỉ còn cảnh báo về `LINUX_VERSION_CODE` (cố ý, để chạy được trên nhiều phiên bản kernel) |
-| Overlay ghép vào `bcm2708-rpi-zero-w.dtb` (bằng `dtmerge` của Raspberry Pi) | Node `&pwm` đổi `compatible`, bật, pinctrl GPIO18 |
-| Toàn bộ lệnh mục 7 → 8, theo đúng thứ tự, kernel 6.12 và 6.18 | Cho kết quả như mô tả |
-| Overlay nạp lúc boot và nạp lúc chạy (configfs, như lệnh `dtoverlay`) | `probe()` thành công; gỡ overlay lúc chạy thì `remove()` chạy |
-| Giá trị ghi vào thanh ghi | Đúng datasheet: RNG/DAT theo xung 20 ns, CTL `0x81` / `0x91`, kênh 1 dịch 8 bit (`0x8100`), `rmmod` ghi CTL = 0 |
-| Chân GPIO18 | pinctrl báo `function alt5`, thuộc thiết bị `2020c000.pwm` |
-
-**Phần chưa thể kiểm thử thay bạn:** xung PWM thật trên chân 12, vì máy giả lập không có khối PWM thật. Trên Pi thật, hãy xác nhận bằng mắt: LED sáng mờ ở mục 8.4 và "thở" ở mục 8.6.
+| Build with Pi kernels **6.6**, **6.12**, **6.18** (`W=1`) | No warnings |
+| `checkpatch.pl` | 0 errors; only warnings about `LINUX_VERSION_CODE` (intentional, to support several kernel versions) |
+| Overlay merged into `bcm2708-rpi-zero-w.dtb` (Raspberry Pi `dtmerge`) | `&pwm` node with new `compatible`, enabled, GPIO18 pinctrl |
+| All commands of sections 7 → 8, in order, kernels 6.12 and 6.18 | Results as described |
+| Overlay loaded at boot and at run time (configfs, as `dtoverlay` does) | `probe()` succeeds; removing the overlay at run time calls `remove()` |
+| Register values | Match the datasheet: RNG/DAT in 20 ns ticks, CTL `0x81` / `0x91`, channel 1 shifted by 8 bits (`0x8100`), `rmmod` writes CTL = 0 |
+| GPIO18 pin | pinctrl reports `function alt5`, owned by `2020c000.pwm` |
+| Real Pi Zero W | LED dim at 25 % (section 8.4), breathing in section 8.6, brighter with inverted polarity |

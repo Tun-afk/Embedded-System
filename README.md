@@ -33,7 +33,7 @@ Embedded-System/
 └── README.md
 ```
 
-Each driver folder has its own detailed step-by-step `README.md` (in Vietnamese): wiring, build,
+Each driver folder has its own detailed step-by-step `README.md`: wiring, build,
 loading, tests and troubleshooting.
 
 ## Hardware connection
