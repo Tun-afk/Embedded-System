@@ -30,7 +30,6 @@ Embedded-System/
 ├── FinalReport/  report (PDF + Word) and presentation slides
 ├── VideoDemo/    links to the three demonstration videos
 ├── images/       evidence screenshots used in the report
-├── LICENSE       GPL-2.0 (same as MODULE_LICENSE in the drivers)
 └── README.md
 ```
 
@@ -110,7 +109,3 @@ More details: [`VideoDemo/`](VideoDemo/).
 
 Chapter 1 covers the theory (platform driver model, Device Tree, kernel frameworks);
 Chapter 2 is a step-by-step guide for each driver with the test results.
-
-## License
-
-GPL-2.0 – see [`LICENSE`](LICENSE).
